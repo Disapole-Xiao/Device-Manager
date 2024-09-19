@@ -7,29 +7,58 @@
   <title>Test</title>
   <style>
     .container {
-      text-align: center;
+      margin: auto;
+      width: fit-content;
+      height: 100%;
+      padding: 10px;
+      padding-top: 10vh;
     }
-
+    
     #view {
+      margin-top: 5px;
       height: 200px;
       width: 300px;
-      margin: 30px auto;
-      text-align: center;
+      padding: 5px;
       border: 2px solid #000;
+      text-align: center;
     }
 
     button {
-      margin: 30px;
+      margin: 5px 5px 5px 0;
       padding: 10px;
-      width: 100px;
+      width: 40%;
+      height: 40px;
+    }
+
+    input {
+      width: 30px;
+      height: 30px;
+    }
+
+    #token {
+      width: 70px;
     }
   </style>
 </head>
 
 <body>
   <div class="container">
-    <button onclick="requestBind()">bind device</button>
-    <button onclick="requestList()">list device</button>
+    <div>
+      <button onclick="requestBind()">bind</button>
+      <button onclick="requestList()">list</button>
+    </div>
+    <div>
+      <button onclick="requestVerify()">verify</button> <input type="text" id="token" placeholder="token"/>
+    </div>
+    <div>
+      <button onclick="requestUnbind()">unbind</button> <input type="text" id="unbind-id" placeholder="id"/>
+    </div>
+    <div>
+      <button onclick="requestLoginOrLogout('login')">login</button> <input type="text" id="login-id" placeholder="id"/>
+    </div>
+    <div>
+      <button onclick="requestLoginOrLogout('logout')">logout</button> <input type="text" id="logout-id" placeholder="id"/>
+    </div>
     <div id="view"></div>
   </div>
 
@@ -37,41 +66,84 @@
     function requestBind() {
       fetch("/bind", {
         method: "POST",
-        //credentials: "include" // 如果需要发送 Cookie 或其他凭证
       })
-        .then(response => {
-          const contentType = response.headers.get('content-type');
-
-          // 判断响应是否是HTML页面
-          if (contentType && contentType.includes('text/html')) {
-            return response.text(); // 处理HTML
-          } else if (contentType && contentType.includes('application/json')) {
-            return response.json(); // 处理JSON
-          } else {
-            throw new Error('未知响应类型');
-          }
-        })
+        .then(response => stringifyRes(response))
         .then(data => {
+          console.log(data);
           document.getElementById("view").innerHTML = data;
-
         })
         .catch(error => {
           console.error('请求出错:', error);
         });
     }
 
+    function requestVerify() {
+      let token = document.getElementById("token").value;
+      fetch("/verify", {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          token: token
+        })
+      })
+        .then(response => stringifyRes(response))
+        .then(data => {
+          console.log(data);
+          document.getElementById("view").innerHTML = data;
+        })
+        .catch(error => console.log('error', error));
+    }
 
     function requestList() {
       fetch("/devices", {
-        //credentials: "include" // 如果需要发送 cookie
       })
-        .then(res => res.json())
+        .then(res => stringifyRes(res))
         .then(data => {
           console.log(data);
-          document.getElementById("view").textContent = JSON.stringify(data);
+          document.getElementById("view").innerHTML = data;
         })
         .catch(error => console.error('获取设备列表出错', error));
     }
+
+    function requestUnbind() {
+      const id = document.getElementById("unbind-id").value;
+      fetch(`/devices/${id}`, {
+        method: "DELETE",
+      })
+        .then(response => stringifyRes(response))
+        .then(data => {
+          console.log(data);
+          document.getElementById("view").innerHTML = data;
+        })
+        .catch(error => console.log('error', error));
+    }
+
+    function requestLoginOrLogout(type) {
+      const id = document.getElementById(`${type}-id`).value;
+      fetch(`/devices/${id}/${type}`, {
+        method: "POST",
+      })
+        .then(response => stringifyRes(response))
+        .then(data => {
+          console.log(data);
+          document.getElementById("view").innerHTML = data;
+        })
+        .catch(error => console.log('error', error));
+    }
+
+    stringifyRes = (response) => {
+      const contentType = response.headers.get('content-type');
+      // 判断响应是否是HTML页面
+      if (contentType && contentType.includes('text/html')) {
+        return response.text(); // 处理HTML
+      } else if (contentType && contentType.includes('application/json')) {
+        return response.json().then(json => JSON.stringify(json)); // 处理JSON并转换为字符串
+      } else {
+        throw new Error('未知响应类型');
+      }
+    };
   </script>
 </body>
 

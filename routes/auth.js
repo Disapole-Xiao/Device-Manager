@@ -7,7 +7,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 // 请求登录预授权码
 function requestAuth(req, res) {
   const app_id = process.env.APP_ID;
-  const redirect_uri = process.env.BASE_URL + '/auth';
+  const redirect_uri = process.env.BASE_URL + ':' + process.env.PORT + '/auth';
   const scope = 'contact:user.employee_id:readonly';
   const feishu = `https://open.feishu.cn/open-apis/authen/v1/authorize?app_id=${app_id}&redirect_uri=${redirect_uri}&scope=${scope}`
   console.debug('Redirect to Feishu:', feishu)
@@ -44,8 +44,8 @@ async function getAppAccessToken(app_id, app_secret) {
     }
     console.debug('Get app access token:', response.data.app_access_token);
     return response.data.app_access_token;
-  } catch (error) {
-    throw new Error('Failed to get app_access_token:' + error.msg);
+  } catch (err) {
+    throw new Error('Failed to get app_access_token:' + err.msg);
   }
 }
 
@@ -71,8 +71,8 @@ async function getUserAccessCode(app_access_token, code) {
     console.debug('Get user access code:', response.data.data.access_token);
     return response.data.data.access_token;
 
-  } catch {
-    throw new Error('Failed to get user_access_code:' + error.msg);
+  } catch(err) {
+    throw new Error('Failed to get user_access_code:' + err.msg);
   }
 }
 
@@ -91,16 +91,16 @@ async function getUserInfo(user_access_token) {
     }
     console.debug('Get user info:', response.data.data);
     return response.data.data;
-  } catch (error) {
-    throw new Error('Failed to get user info:' + error.msg);
+  } catch (err) {
+    throw new Error('Failed to get user info:' + err.msg);
   }
 }
 
 // 授权回调函数
 async function handleAuthCallback(req, res) {
   try {
-    if (req.query.error) {
-      console.debug(req.query.error);
+    if (req.query.err) {
+      console.debug(req.query.err);
       return res.redirect('/');
     }
     console.debug('Auth callback: get code: ', req.query.code);
@@ -114,14 +114,14 @@ async function handleAuthCallback(req, res) {
 
     res.cookie('jwt', token, {
       httpOnly: true,
-      secure: true,
+      // secure: true, // TMP: 在非 HTTPS 环境下注释掉这一行
       sameSite: 'Strict',
       maxAge: 24 * 60 * 60 * 1000 // TMP: Cookie 的有效期为 24 小时
     });
     console.debug('JWT generated: ', token);
     res.redirect('/');
-  } catch (error) {
-    res.send('Authorization failed:' + error.msg);
+  } catch (err) {
+    res.send('Authorization failed:' + err.msg);
   }
 }
 
@@ -133,13 +133,14 @@ function generateJWT(userId) {
 // 验证 JWT 的中间件
 function authMiddleware(req, res, next) {
   const token = req.cookies.jwt;
-
   if (!token) {
+    console.debug('No JWT found, redirect to auth page')
     return requestAuth(req, res);
   }
 
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) {
+      console.debug('Invalid JWT, redirect to auth page');
       return requestAuth(req, res);
     }
     req.userId = decoded.userId; // 将解码的用户信息存入 req.userId

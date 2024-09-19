@@ -5,8 +5,6 @@ const { handleAuthCallback, authMiddleware } = require('./routes/auth');
 const bindDevice = require('./routes/bind');
 const verifyDevice = require('./routes/verify');
 const devicesRouter = require('./routes/devices');
-const { default: axios } = require('axios');
-
 
 
 const app = express();
@@ -17,10 +15,6 @@ const path = require('path'); //
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(express.json(), cookieParser());
-app.use((res, req, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  next();
-})
 
 // 发送 token
 app.post("/bind", authMiddleware, bindDevice);
@@ -38,5 +32,5 @@ app.get('/', (req, res) => {
 
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server listening on http://localhost:${PORT}`)
+  console.log(`Server listening on ${process.env.BASE_URL}:${PORT}`)
 });

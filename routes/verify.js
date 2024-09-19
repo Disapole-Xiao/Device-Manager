@@ -13,7 +13,7 @@ function verifyDevice(req, res) {
     } 
     db.prepare(`DELETE FROM tokens WHERE token = ? AND due > ?`).run(token, Date.now());
     db.prepare(`INSERT INTO devices (user_id, ip, logged_in) VALUES (?, ?, TRUE)`).run(userId, deviceIp)
-    console.debug(`user ${req.userId} bound device ${deviceIp}`);
+    console.debug(`user ${userId} bound device ${deviceIp}`);
     res.json({ status: 'success', message: 'Device bound successfully' });
     
   } catch (err) {
