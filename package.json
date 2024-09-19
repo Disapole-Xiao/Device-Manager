@@ -1,5 +1,5 @@
 {
-  "name": "ip-manager",
+  "name": "device-manager",
   "version": "1.0.0",
   "type": "commonjs",
   "main": "app.js",

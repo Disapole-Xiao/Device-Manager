@@ -20,7 +20,8 @@
       width: 300px;
       padding: 5px;
       border: 2px solid #000;
-      text-align: center;
+      overflow-y: scroll;
+      word-break:break-all;
     }
 
     button {
@@ -36,7 +37,7 @@
     }
 
     #token {
-      width: 70px;
+      width: 90px;
     }
   </style>
 </head>
@@ -48,16 +49,20 @@
       <button onclick="requestList()">list</button>
     </div>
     <div>
-      <button onclick="requestVerify()">verify</button> <input type="text" id="token" placeholder="token"/>
+      <button onclick="requestVerify()">verify</button>
+      <input type="text" id="token" placeholder="token"/>
     </div>
     <div>
-      <button onclick="requestUnbind()">unbind</button> <input type="text" id="unbind-id" placeholder="id"/>
+      <button onclick="requestUnbind()">unbind</button>
+      <input type="text" id="unbind-id" placeholder="id"/>
     </div>
     <div>
-      <button onclick="requestLoginOrLogout('login')">login</button> <input type="text" id="login-id" placeholder="id"/>
+      <button onclick="requestLoginOrLogout('login')">login</button>
+      <input type="text" id="login-id" placeholder="id"/>
     </div>
     <div>
-      <button onclick="requestLoginOrLogout('logout')">logout</button> <input type="text" id="logout-id" placeholder="id"/>
+      <button onclick="requestLoginOrLogout('logout')">logout</button>
+      <input type="text" id="logout-id" placeholder="id"/>
     </div>
     <div id="view"></div>
   </div>
