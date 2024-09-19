@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test</title>
+  <style>
+    .container {
+      text-align: center;
+    }
+
+    #view {
+      height: 200px;
+      width: 300px;
+      margin: 30px auto;
+      text-align: center;
+      border: 2px solid #000;
+    }
+
+    button {
+      margin: 30px;
+      padding: 10px;
+      width: 100px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <button onclick="requestBind()">bind device</button>
+    <button onclick="requestList()">list device</button>
+    <div id="view"></div>
+  </div>
+
+  <script>
+    function requestBind() {
+      fetch("/bind", {
+        method: "POST",
+        //credentials: "include" // 如果需要发送 Cookie 或其他凭证
+      })
+        .then(response => {
+          const contentType = response.headers.get('content-type');
+
+          // 判断响应是否是HTML页面
+          if (contentType && contentType.includes('text/html')) {
+            return response.text(); // 处理HTML
+          } else if (contentType && contentType.includes('application/json')) {
+            return response.json(); // 处理JSON
+          } else {
+            throw new Error('未知响应类型');
+          }
+        })
+        .then(data => {
+          document.getElementById("view").innerHTML = data;
+
+        })
+        .catch(error => {
+          console.error('请求出错:', error);
+        });
+    }
+
+
+    function requestList() {
+      fetch("/devices", {
+        //credentials: "include" // 如果需要发送 cookie
+      })
+        .then(res => res.json())
+        .then(data => {
+          console.log(data);
+          document.getElementById("view").textContent = JSON.stringify(data);
+        })
+        .catch(error => console.error('获取设备列表出错', error));
+    }
+  </script>
+</body>
+
+</html>
