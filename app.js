@@ -25,8 +25,8 @@ app.use('/devices', authMiddleware, devicesRouter);
 app.get('/auth', handleAuthCallback);
 
 // 测试界面
-app.get('/test', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', '.html'));
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 })
 
 
