@@ -5,7 +5,7 @@ function verifyDevice(req, res) {
   try {
     const token = req.body.token.toUpperCase(); // 忽略大小写
     const deviceIp = req.ip;
-    console.debug('POST /verify received token=', token);
+    console.debug('>>> POST /verify  token=', token);
     const userId = db.prepare(`SELECT user_id FROM tokens WHERE token = ? AND due > ?`)
                      .pluck().get(token, Date.now());
     if (!userId) {

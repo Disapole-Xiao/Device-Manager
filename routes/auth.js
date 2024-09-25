@@ -1,20 +1,25 @@
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
-const dotenv = require('dotenv');
-dotenv.config();
+
 const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXP_TIME = process.env.JWT_EXP_TIME ?? '6h'; // 6h
+const COOKIE_EXP_TIME = Number(process.env.COOKIE_EXP_TIME) ?? 24 * 60 * 60 * 1000; // 24h
+const APP_ID = process.env.APP_ID;
+const APP_SECRET = process.env.APP_SECRET;
+const BASE_URL = process.env.BASE_URL;
+const PORT = process.env.PORT;
 
 // 请求登录预授权码
 function requestAuth(req, res) {
-  const app_id = process.env.APP_ID;
-  const redirect_uri = process.env.BASE_URL + ':' + process.env.PORT + '/auth';
+  const app_id = APP_ID;
+  const redirect_uri = BASE_URL + ':' + PORT + '/auth';
   const scope = 'contact:user.employee_id:readonly';
-  const feishu = `https://open.feishu.cn/open-apis/authen/v1/authorize?app_id=${app_id}&redirect_uri=${redirect_uri}&scope=${scope}`
-  console.debug('Redirect to Feishu:', feishu)
+  const feishu = `https://open.feishu.cn/open-apis/authen/v1/authorize?app_id=${app_id}&redirect_uri=${redirect_uri}&scope=${scope}`;
+  console.debug('...Redirect to Feishu:', feishu);
   // 返回包含飞书认证链接的 HTML 页面
   res.send(`
     <div>
-      <h1>绑定飞书账号</h1>
+      <h1>飞书认证</h1>
       <p>点击下方按钮，跳转到飞书进行认证。</p>
       <a href="${feishu}">
         <button>绑定飞书</button>
@@ -30,25 +35,24 @@ async function getAppAccessToken(app_id, app_secret) {
       method: 'POST',
       url: 'https://open.feishu.cn/open-apis/auth/v3/app_access_token/internal',
       headers: {
-        'Content-Type': 'application/json; charset=utf-8'
+        'Content-Type': 'application/json; charset=utf-8',
       },
       data: {
         app_id,
-        app_secret
-      }
+        app_secret,
+      },
     });
 
     // 检查返回的结果
     if (response.data.code !== 0) {
       throw new Error(response.data.msg);
     }
-    console.debug('Get app access token:', response.data.app_access_token);
+    console.debug('Get app_access_token=', response.data.app_access_token);
     return response.data.app_access_token;
   } catch (err) {
     throw new Error('Failed to get app_access_token:' + err.msg);
   }
 }
-
 
 // 获取 user_access_code
 async function getUserAccessCode(app_access_token, code) {
@@ -58,20 +62,19 @@ async function getUserAccessCode(app_access_token, code) {
       url: 'https://open.feishu.cn/open-apis/authen/v1/oidc/access_token',
       headers: {
         'Authorization': `Bearer ${app_access_token}`,
-        'Content-Type': 'application/json; charset=utf-8'
+        'Content-Type': 'application/json; charset=utf-8',
       },
       data: {
-        'grant_type': 'authorization_code',
-        'code': code
-      }
+        grant_type: 'authorization_code',
+        code: code,
+      },
     });
     if (response.data.code !== 0) {
       throw new Error(response.data.msg);
     }
-    console.debug('Get user access code:', response.data.data.access_token);
+    console.debug('Get user_access_code=', response.data.data.access_token);
     return response.data.data.access_token;
-
-  } catch(err) {
+  } catch (err) {
     throw new Error('Failed to get user_access_code:' + err.msg);
   }
 }
@@ -83,16 +86,16 @@ async function getUserInfo(user_access_token) {
       method: 'GET',
       url: 'https://open.feishu.cn/open-apis/authen/v1/user_info',
       headers: {
-        'Authorization': `Bearer ${user_access_token}`
-      }
+        Authorization: `Bearer ${user_access_token}`,
+      },
     });
     if (response.data.code !== 0) {
       throw new Error(response.data.msg);
     }
-    console.debug('Get user info:', response.data.data);
+    console.debug('Get user_info=', response.data.data);
     return response.data.data;
   } catch (err) {
-    throw new Error('Failed to get user info:' + err.msg);
+    throw new Error('Failed to get user_info:' + err.msg);
   }
 }
 
@@ -103,10 +106,10 @@ async function handleAuthCallback(req, res) {
       console.debug(req.query.err);
       return res.redirect('/');
     }
-    console.debug('Auth callback: get code: ', req.query.code);
+    console.debug('Feishu callback: code=', req.query.code);
     const code = req.query.code,
-      app_id = process.env.APP_ID,
-      app_secret = process.env.APP_SECRET,
+      app_id = APP_ID,
+      app_secret = APP_SECRET,
       app_access_token = await getAppAccessToken(app_id, app_secret),
       user_access_token = await getUserAccessCode(app_access_token, code),
       user_info = await getUserInfo(user_access_token),
@@ -114,33 +117,33 @@ async function handleAuthCallback(req, res) {
 
     res.cookie('jwt', token, {
       httpOnly: true,
-      // secure: true, // TMP: 在非 HTTPS 环境下注释掉这一行
+      // secure: true, // 在非 HTTPS 环境下注释掉这一行
       sameSite: 'Strict',
-      maxAge: 24 * 60 * 60 * 1000 // TMP: Cookie 的有效期为 24 小时
+      maxAge: COOKIE_EXP_TIME, // Cookie 有效期
     });
-    console.debug('JWT generated: ', token);
+    console.debug('JWT generated:', token);
     res.redirect('/');
   } catch (err) {
-    res.send('Authorization failed:' + err.msg);
+    res.send('Failed to authorization:' + err.msg);
   }
 }
 
 // 生成 JWT
 function generateJWT(userId) {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '6h' }); // TMP: 过期时间可以再调整
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: JWT_EXP_TIME });
 }
 
 // 验证 JWT 的中间件
 function authMiddleware(req, res, next) {
   const token = req.cookies.jwt;
   if (!token) {
-    console.debug('No JWT found, redirect to auth page')
+    console.debug('No JWT found, requestAuth');
     return requestAuth(req, res);
   }
 
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) {
-      console.debug('Invalid JWT, redirect to auth page');
+      console.debug('Invalid JWT, requestAuth');
       return requestAuth(req, res);
     }
     req.userId = decoded.userId; // 将解码的用户信息存入 req.userId

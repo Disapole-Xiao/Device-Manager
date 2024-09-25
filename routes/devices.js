@@ -2,6 +2,7 @@ const db = require('../db');
 const axios = require('axios');
 const express = require('express');
 const devicesRouter = express.Router();
+const LOGIN_PROXY = process.env.LOGIN_PROXY ?? 'http://localhost/api/login';
 
 // 解绑设备
 devicesRouter.delete('/:id(\\d+)', unbindDevice);
@@ -19,8 +20,10 @@ devicesRouter.get('/', listDevices);
 function unbindDevice(req, res) {
   try {
     const id = req.params.id;
-    console.debug('DELETE /devices/:id received id=', id);
-    const info = db.prepare(`DELETE FROM devices WHERE id = ? AND user_id = ?`).run(id, req.userId);
+    console.debug(`>>> DELETE /devices/${id}`);
+    const info = db
+      .prepare(`DELETE FROM devices WHERE id = ? AND user_id = ?`)
+      .run(id, req.userId);
     // 如果没有设备被删除，说明该用户没有该设备
     if (info.changes === 0) {
       return res.status(404).json({ status: 'error', message: 'Device not found' });
@@ -36,42 +39,31 @@ function unbindDevice(req, res) {
 async function loginDevice(req, res) {
   try {
     const id = req.params.id;
-    console.debug('POST /devices/:id/login received id=', id);
+    console.debug(`>>> POST /devices/${id}/login`);
     const userId = req.userId;
-    const deviceIp = db.prepare(`SELECT ip FROM devices WHERE id = ? AND user_id = ?`)
-      .pluck().get(id, userId);
+    const deviceIp = db
+      .prepare(`SELECT ip FROM devices WHERE id = ? AND user_id = ?`)
+      .pluck()
+      .get(id, userId);
     if (!deviceIp) {
       return res.status(404).json({ status: 'error', message: 'Device not found' });
     }
-    const isSuccess = await requestLogin(userId, deviceIp);
-    if (!isSuccess) {
-      return res.json({ status: 'denied', message: 'Login denied' });
+
+    // 代登录
+    const response = await axios.post(LOGIN_PROXY, {
+      username: userId,
+      ip: deviceIp,
+    });
+    if (!response.data.success) {
+      console.log('Login denied');
+      return res.json({ status: 'denied', message: response.message });
     }
+    console.log('Login success');
     db.prepare(`UPDATE devices SET logged_in = TRUE WHERE id = ?`).run(id);
     res.json({ status: 'success', message: 'Device logged in successfully' });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ status: 'error', message: 'Failed to login device' });
-  }
-}
-
-// 请求登录校园网，返回值代表登录是否被同意
-async function requestLogin(username, ip) {
-  try {
-    const response = await axios.post('https://yxms.byr.ink/api/login', {
-      username,
-      ip
-    });
-
-    console.debug('!!! requstLogin', response.data);
-    if (response.data.success) {
-      return true;
-    }
-    return false;
-  } catch (err) {
-    console.error(err);
-    throw new Error('Failed to request login');
   }
 }
 
@@ -79,11 +71,16 @@ async function requestLogin(username, ip) {
 function logoutDevice(req, res) {
   try {
     const id = req.params.id;
-    console.debug('POST /devices/:id/logout received id=', id);
+    console.debug(`>>> POST /devices/${id}/logout`);
     const userId = req.userId;
-    const info = db.prepare(`UPDATE devices SET logged_in = FALSE WHERE id = ? AND user_id = ?`).run(id, userId);
+
+    const info = db
+      .prepare(`UPDATE devices SET logged_in = FALSE WHERE id = ? AND user_id = ?`)
+      .run(id, userId);
     if (info.changes === 0) {
-      return res.status(404).json({ status: 'error', message: 'Device not found or already logged out' });
+      return res
+        .status(404)
+        .json({ status: 'error', message: 'Device not found or already logged out' });
     }
     res.json({ status: 'success', message: 'Device logged out successfully' });
   } catch (err) {
@@ -95,8 +92,10 @@ function logoutDevice(req, res) {
 // 查看该用户设备列表
 function listDevices(req, res) {
   try {
-    console.debug('GET /devices');
-    let devices = db.prepare(`SELECT id, ip, logged_in FROM devices WHERE user_id = ?`).all(req.userId);
+    console.debug('>>> GET /devices');
+    let devices = db
+      .prepare(`SELECT id, ip, logged_in FROM devices WHERE user_id = ?`)
+      .all(req.userId);
     devices = devices.map(device => {
       device.logged_in = Boolean(device.logged_in);
       return device;
@@ -107,6 +106,6 @@ function listDevices(req, res) {
     console.error(err);
     res.status(500).json({ status: 'error', message: 'Failed to list devices' });
   }
-};
+}
 
 module.exports = devicesRouter;
