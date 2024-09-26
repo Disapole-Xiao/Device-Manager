@@ -1,5 +1,4 @@
 const express = require('express');
-const cookieParser = require('cookie-parser');
 const path = require('path');
 require('dotenv').config();
 const { handleAuthCallback, authMiddleware } = require('./routes/auth');
@@ -13,7 +12,7 @@ const app = express();
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use(express.json(), cookieParser());
+app.use(express.json());
 
 // 发送 token
 app.post("/bind", authMiddleware, bindDevice);

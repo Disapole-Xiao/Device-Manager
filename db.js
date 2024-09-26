@@ -21,7 +21,7 @@ try {
   `).run();
   
 } catch (err) {
-  console.error('Failed to create tables.', err);
+  console.error('Failed to create tables:', err);
 }
 
 module.exports = db;

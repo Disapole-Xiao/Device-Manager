@@ -16,16 +16,8 @@ function requestAuth(req, res) {
   const scope = 'contact:user.employee_id:readonly';
   const feishu = `https://open.feishu.cn/open-apis/authen/v1/authorize?app_id=${app_id}&redirect_uri=${redirect_uri}&scope=${scope}`;
   console.debug('...Redirect to Feishu:', feishu);
-  // 返回包含飞书认证链接的 HTML 页面
-  res.send(`
-    <div>
-      <h1>飞书认证</h1>
-      <p>点击下方按钮，跳转到飞书进行认证。</p>
-      <a href="${feishu}">
-        <button>绑定飞书</button>
-      </a>
-    </div>
-  `);
+  // 返回飞书认证链接
+  res.send({'link': feishu});
 }
 
 // 获取 app_access_token
@@ -50,7 +42,7 @@ async function getAppAccessToken(app_id, app_secret) {
     console.debug('Get app_access_token=', response.data.app_access_token);
     return response.data.app_access_token;
   } catch (err) {
-    throw new Error('Failed to get app_access_token:' + err.msg);
+    throw new Error('Failed to get app_access_token:' + err);
   }
 }
 
@@ -75,7 +67,7 @@ async function getUserAccessCode(app_access_token, code) {
     console.debug('Get user_access_code=', response.data.data.access_token);
     return response.data.data.access_token;
   } catch (err) {
-    throw new Error('Failed to get user_access_code:' + err.msg);
+    throw new Error('Failed to get user_access_code:' + err);
   }
 }
 
@@ -95,7 +87,7 @@ async function getUserInfo(user_access_token) {
     console.debug('Get user_info=', response.data.data);
     return response.data.data;
   } catch (err) {
-    throw new Error('Failed to get user_info:' + err.msg);
+    throw new Error('Failed to get user_info:' + err);
   }
 }
 
@@ -104,7 +96,7 @@ async function handleAuthCallback(req, res) {
   try {
     if (req.query.err) {
       console.debug(req.query.err);
-      return res.redirect('/');
+      return res.status(400).json({status: 'error', message: 'req.query.err'});
     }
     console.debug('Feishu callback: code=', req.query.code);
     const code = req.query.code,
@@ -113,18 +105,21 @@ async function handleAuthCallback(req, res) {
       app_access_token = await getAppAccessToken(app_id, app_secret),
       user_access_token = await getUserAccessCode(app_access_token, code),
       user_info = await getUserInfo(user_access_token),
-      token = generateJWT(user_info.user_id);
+      userId = user_info.user_id,
+      jwt_token = generateJWT(userId);
 
-    res.cookie('jwt', token, {
-      httpOnly: true,
-      // secure: true, // 在非 HTTPS 环境下注释掉这一行
-      sameSite: 'Strict',
-      maxAge: COOKIE_EXP_TIME, // Cookie 有效期
-    });
-    console.debug('JWT generated:', token);
-    res.redirect('/');
+    // res.cookie('jwt', token, {
+    //   httpOnly: true,
+    //   // secure: true, // 在非 HTTPS 环境下注释掉这一行
+    //   sameSite: 'Strict',
+    //   maxAge: COOKIE_EXP_TIME, // Cookie 有效期
+    // });
+
+    console.debug('JWT generated:', jwt_token);
+    res.json({status: 'success', user_id: userId, jwt: jwt_token});
   } catch (err) {
-    res.send('Failed to authorization:' + err.msg);
+    console.error(err);
+    res.status(500).json({status: 'error', meassage: 'Failed to authorize'});
   }
 }
 
@@ -135,19 +130,22 @@ function generateJWT(userId) {
 
 // 验证 JWT 的中间件
 function authMiddleware(req, res, next) {
-  const token = req.cookies.jwt;
+  const authHeader = req.get('Authorization');
+  console.log(authHeader);
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
+
   if (!token) {
-    console.debug('No JWT found, requestAuth');
+    console.debug('vvvv No JWT found, requestAuth');
     return requestAuth(req, res);
   }
 
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) {
-      console.debug('Invalid JWT, requestAuth');
+      console.debug('vvvv Invalid JWT, requestAuth');
       return requestAuth(req, res);
     }
     req.userId = decoded.userId; // 将解码的用户信息存入 req.userId
-    console.debug('JWT verified, user_id=', decoded.userId);
+    console.debug('vvvv JWT verified, user_id=', decoded.userId);
     next();
   });
 }

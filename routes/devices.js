@@ -48,14 +48,13 @@ async function loginDevice(req, res) {
     if (!deviceIp) {
       return res.status(404).json({ status: 'error', message: 'Device not found' });
     }
-
     // 代登录
     const response = await axios.post(LOGIN_PROXY, {
       username: userId,
       ip: deviceIp,
     });
     if (!response.data.success) {
-      console.log('Login denied');
+      console.log('Login denied:', response.data);
       return res.json({ status: 'denied', message: response.message });
     }
     console.log('Login success');
