@@ -62,9 +62,8 @@ const stmt = {
   
   /**
    * @param {number} id
-   * @param {string} user_id
    */
-  deleteUserDevice: db.prepare(`DELETE FROM devices WHERE id = ? AND user_id = ?`),
+  deleteDevice: db.prepare(`DELETE FROM devices WHERE id = ?`),
 
   /*************** TOKENS ****************/
   /**

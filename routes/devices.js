@@ -22,13 +22,14 @@ function unbindDevice(req, res) {
   try {
     const id = req.params.id;
     console.debug(`>>> DELETE /devices/${id}`);
-    const info = db.deleteUserDevice.run(id, req.userId);
-    // 如果没有设备被删除，说明该用户没有该设备
-    if (info.changes === 0) {
+    const { ip } = db.selectUserDeviceById.get(id, req.userId) ?? {};
+    if (!ip) {
       console.debug(`Device ${id} not found`);
       return res.status(404).json({ status: 'error', message: 'Device not found' });
     }
-    console.debug(`Device ${id} unbound`);
+    db.deleteDevice.run(id);
+    pinger.removeTimer(ip)
+    console.debug(`Device ${id} ${ip} unbound`);
     res.json({ status: 'success', message: 'Device unbound successfully' });
   } catch (err) {
     console.error(err);

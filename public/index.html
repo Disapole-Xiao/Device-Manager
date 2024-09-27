@@ -72,7 +72,7 @@
 
       let jwt = localStorage.getItem('jwt'),
         user_id = localStorage.getItem('user_id'),
-        loginListener = ' https://yxms.byr.ink';
+        loginListener = 'http://10.117.251.75';
 
       function auth() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -158,7 +158,7 @@
       function requestLogin() {
         const id = document.getElementById('login-id').value;
         // 打开新标签页，延迟1s
-        window.open(loginListener + '/' + user_id, '_blank');
+        window.open(`${loginListener}/?username=${user_id}`, '_blank');
         setTimeout(() => {
           request(`/devices/${id}/login`, {
             method: 'POST',
