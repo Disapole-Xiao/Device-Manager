@@ -21,7 +21,7 @@ app.post('/verify', verifyDevice);
 // 解绑设备
 app.use('/devices', authMiddleware, devicesRouter);
 // 用户认证
-app.get('/auth', handleAuthCallback);
+app.post('/auth', handleAuthCallback);
 
 // 测试界面
 app.get('/', (req, res) => {

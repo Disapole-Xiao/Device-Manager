@@ -1,155 +1,183 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Test</title>
-  <style>
-    .container {
-      margin: auto;
-      width: fit-content;
-      height: 100%;
-      padding: 10px;
-      padding-top: 10vh;
-    }
-    
-    #view {
-      margin-top: 5px;
-      height: 200px;
-      width: 300px;
-      padding: 5px;
-      border: 1px solid #000;
-      overflow-y: scroll;
-      word-break:break-all;
-    }
-
-    button {
-      margin: 5px 5px 5px 0;
-      padding: 10px;
-      width: 40%;
-      height: 40px;
-    }
-
-    input {
-      width: 30px;
-      height: 30px;
-    }
-
-    #token {
-      width: 90px;
-    }
-  </style>
-</head>
-
-<body>
-  <div class="container">
-    <div>
-      <button onclick="requestBind()">bind</button>
-      <button onclick="requestList()">list</button>
-    </div>
-    <div>
-      <button onclick="requestVerify()">verify</button>
-      <input type="text" id="token" placeholder="token"/>
-    </div>
-    <div>
-      <button onclick="requestUnbind()">unbind</button>
-      <input type="text" id="unbind-id" placeholder="id"/>
-    </div>
-    <div>
-      <button onclick="requestLoginOrLogout('login')">login</button>
-      <input type="text" id="login-id" placeholder="id"/>
-    </div>
-    <div>
-      <button onclick="requestLoginOrLogout('logout')">logout</button>
-      <input type="text" id="logout-id" placeholder="id"/>
-    </div>
-    <div id="view"></div>
-  </div>
-
-  <script>
-    function requestBind() {
-      fetch("/bind", {
-        method: "POST",
-      })
-        .then(response => stringifyRes(response))
-        .then(data => {
-          console.log(data);
-          document.getElementById("view").innerHTML = data;
-        })
-        .catch(error => {
-          console.error('请求出错:', error);
-        });
-    }
-
-    function requestVerify() {
-      let token = document.getElementById("token").value;
-      fetch("/verify", {
-        method: "POST",
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          token: token
-        })
-      })
-        .then(response => stringifyRes(response))
-        .then(data => {
-          console.log(data);
-          document.getElementById("view").innerHTML = data;
-        })
-        .catch(error => console.log('error', error));
-    }
-
-    function requestList() {
-      fetch("/devices", {
-      })
-        .then(res => stringifyRes(res))
-        .then(data => {
-          console.log(data);
-          document.getElementById("view").innerHTML = data;
-        })
-        .catch(error => console.error('获取设备列表出错', error));
-    }
-
-    function requestUnbind() {
-      const id = document.getElementById("unbind-id").value;
-      fetch(`/devices/${id}`, {
-        method: "DELETE",
-      })
-        .then(response => stringifyRes(response))
-        .then(data => {
-          console.log(data);
-          document.getElementById("view").innerHTML = data;
-        })
-        .catch(error => console.log('error', error));
-    }
-
-    function requestLoginOrLogout(type) {
-      const id = document.getElementById(`${type}-id`).value;
-      fetch(`/devices/${id}/${type}`, {
-        method: "POST",
-      })
-        .then(response => stringifyRes(response))
-        .then(data => {
-          console.log(data);
-          document.getElementById("view").innerHTML = data;
-        })
-        .catch(error => console.log('error', error));
-    }
-
-    stringifyRes = (response) => {
-      const contentType = response.headers.get('content-type');
-      // 判断响应是否是HTML页面
-      if (contentType && contentType.includes('text/html')) {
-        return response.text(); // 处理HTML
-      } else if (contentType && contentType.includes('application/json')) {
-        return response.json().then(json => JSON.stringify(json)); // 处理JSON并转换为字符串
-      } else {
-        throw new Error('未知响应类型');
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test</title>
+    <style>
+      .container {
+        margin: auto;
+        width: fit-content;
+        height: 100%;
+        padding: 10px;
+        padding-top: 10vh;
       }
-    };
-  </script>
-</body>
 
+      #view {
+        margin-top: 5px;
+        height: 200px;
+        width: 300px;
+        padding: 5px;
+        border: 1px solid #000;
+        overflow-y: scroll;
+        word-break: break-all;
+        font-size: medium;
+      }
+
+      button {
+        margin: 5px 5px 5px 0;
+        padding: 10px;
+        width: 40%;
+        height: 40px;
+      }
+
+      input {
+        width: 30px;
+        height: 30px;
+      }
+
+      #token {
+        width: 90px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div>
+        <button onclick="requestBind()">bind</button>
+        <button onclick="requestList()">list</button>
+      </div>
+      <div>
+        <button onclick="requestVerify()">verify</button>
+        <input type="text" id="token" placeholder="token" />
+      </div>
+      <div>
+        <button onclick="requestUnbind()">unbind</button>
+        <input type="text" id="unbind-id" placeholder="id" />
+      </div>
+      <div>
+        <button onclick="requestLogin()">login</button>
+        <input type="text" id="login-id" placeholder="id" />
+      </div>
+      <div>
+        <button onclick="requestLogout()">logout</button>
+        <input type="text" id="logout-id" placeholder="id" />
+      </div>
+      <div id="view"></div>
+    </div>
+
+    <script>
+      auth();
+
+      let jwt = localStorage.getItem('jwt'),
+        user_id = localStorage.getItem('user_id'),
+        loginListener = ' https://yxms.byr.ink';
+
+      function auth() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        if (code) {
+          fetch(`/auth`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ code }),
+          })
+            .then(res => res.json())
+            .then(data => {
+              if (data.status === 'success') {
+                localStorage.setItem('user_id', data.user_id);
+                localStorage.setItem('jwt', data.jwt);
+                window.location.href = '/';
+              }
+            });
+        }
+      }
+
+      async function request(...args) {
+        try {
+          const res = await fetch(...args);
+          const data = await res.json();
+          if (data.link) {
+            document.getElementById('view').innerHTML = `
+            <p>点击下方按钮，跳转到飞书进行认证。</p>
+            <a href="${data.link}">
+               <button>绑定飞书</button>
+            </a>
+          `;
+          } else {
+            console.log(data);
+            const formattedJson = JSON.stringify(data, null, 2);
+            document.getElementById('view').innerHTML = `<pre>${formattedJson}</pre>`;
+          }
+        } catch (err) {
+          console.log(err);
+        }
+      }
+
+      function requestBind() {
+        request('/bind', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${jwt}`,
+          },
+        });
+      }
+
+      function requestVerify() {
+        let token = document.getElementById('token').value;
+        request('/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token }),
+        });
+      }
+
+      function requestList() {
+        request('/devices', {
+          headers: {
+            Authorization: `Bearer ${jwt}`,
+          },
+        });
+      }
+
+      function requestUnbind() {
+        const id = document.getElementById('unbind-id').value;
+        request(`/devices/${id}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${jwt}`,
+          },
+        });
+      }
+
+      function requestLogin() {
+        const id = document.getElementById('login-id').value;
+        // 打开新标签页，延迟1s
+        window.open(loginListener + '/' + user_id, '_blank');
+        setTimeout(() => {
+          request(`/devices/${id}/login`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${jwt}`,
+            },
+          });
+        }, 1000);
+      }
+
+      function requestLogout() {
+        const id = document.getElementById('logout-id').value;
+        request(`/devices/${id}/logout`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${jwt}`,
+          },
+        });
+      }
+    </script>
+  </body>
 </html>

@@ -1,8 +1,9 @@
-const db = require('../db');
 const axios = require('axios');
 const express = require('express');
+const db = require('../db');
+const pinger = require('../pinger');
 const devicesRouter = express.Router();
-const LOGIN_PROXY = process.env.LOGIN_PROXY ?? 'http://localhost/api/login';
+const LOGIN_PROXY = process.env.LOGIN_PROXY || 'http://localhost/api/login';
 
 // 解绑设备
 devicesRouter.delete('/:id(\\d+)', unbindDevice);
@@ -21,13 +22,13 @@ function unbindDevice(req, res) {
   try {
     const id = req.params.id;
     console.debug(`>>> DELETE /devices/${id}`);
-    const info = db
-      .prepare(`DELETE FROM devices WHERE id = ? AND user_id = ?`)
-      .run(id, req.userId);
+    const info = db.deleteUserDevice.run(id, req.userId);
     // 如果没有设备被删除，说明该用户没有该设备
     if (info.changes === 0) {
+      console.debug(`Device ${id} not found`);
       return res.status(404).json({ status: 'error', message: 'Device not found' });
     }
+    console.debug(`Device ${id} unbound`);
     res.json({ status: 'success', message: 'Device unbound successfully' });
   } catch (err) {
     console.error(err);
@@ -41,24 +42,23 @@ async function loginDevice(req, res) {
     const id = req.params.id;
     console.debug(`>>> POST /devices/${id}/login`);
     const userId = req.userId;
-    const deviceIp = db
-      .prepare(`SELECT ip FROM devices WHERE id = ? AND user_id = ?`)
-      .pluck()
-      .get(id, userId);
-    if (!deviceIp) {
+    const { ip } = db.selectUserDeviceById.get(id, userId) ?? {};
+    if (!ip) {
+      console.debug(`Device ${id} not found`);
       return res.status(404).json({ status: 'error', message: 'Device not found' });
     }
     // 代登录
     const response = await axios.post(LOGIN_PROXY, {
       username: userId,
-      ip: deviceIp,
+      ip: ip,
     });
     if (!response.data.success) {
-      console.log('Login denied:', response.data);
-      return res.json({ status: 'denied', message: response.message });
+      console.debug(`Device ${id} ${ip} login denied:`, response.data);
+      return res.json({ status: 'denied', message: response.data.error });
     }
-    console.log('Login success');
-    db.prepare(`UPDATE devices SET logged_in = TRUE WHERE id = ?`).run(id);
+    console.debug(`Device ${id} ${ip} login success`);
+    db.updateDeviceById.run(1, id);
+    pinger.addTimer(ip); // 保活
     res.json({ status: 'success', message: 'Device logged in successfully' });
   } catch (err) {
     console.error(err);
@@ -72,15 +72,18 @@ function logoutDevice(req, res) {
     const id = req.params.id;
     console.debug(`>>> POST /devices/${id}/logout`);
     const userId = req.userId;
-
-    const info = db
-      .prepare(`UPDATE devices SET logged_in = FALSE WHERE id = ? AND user_id = ?`)
-      .run(id, userId);
-    if (info.changes === 0) {
-      return res
-        .status(404)
-        .json({ status: 'error', message: 'Device not found or already logged out' });
+    const { ip, logged_in } = db.selectUserDeviceById.get(id, userId) ?? {};
+    if (!ip) {
+      console.debug(`Device ${id} not found`);
+      return res.status(404).json({ status: 'error', message: 'Device not found' });
     }
+    if (!logged_in) {
+      console.debug(`Device ${id} ${ip} already logged out`);
+      return res.json({ status: 'success', message: 'Device already logged out' });
+    }
+    db.updateDeviceById.run(0, id);
+    pinger.removeTimer(ip);
+    console.debug(`Device ${id} ${ip} logged out`);
     res.json({ status: 'success', message: 'Device logged out successfully' });
   } catch (err) {
     console.error(err);
@@ -92,9 +95,7 @@ function logoutDevice(req, res) {
 function listDevices(req, res) {
   try {
     console.debug('>>> GET /devices');
-    let devices = db
-      .prepare(`SELECT id, ip, logged_in FROM devices WHERE user_id = ?`)
-      .all(req.userId);
+    let devices = db.selectUserDevices.all(req.userId);
     devices = devices.map(device => {
       device.logged_in = Boolean(device.logged_in);
       return device;

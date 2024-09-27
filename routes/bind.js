@@ -1,13 +1,10 @@
 const db = require('../db');
 
 const TOKEN_EXP_TIME = 5 * 60 * 1000; // 5分钟
-const CLEAN_INTERVAL = Number(process.env.CLEAN_INTERVAL) ?? 60 * 60 * 1000; // 1h
+const CLEAN_INTERVAL = Number(process.env.CLEAN_INTERVAL) || 60 * 60 * 1000; // 1h
 
 // 每隔一段时间清理过期token
-setInterval(
-  () => db.prepare(`DELETE FROM tokens WHERE due < ?`).run(Date.now()),
-  CLEAN_INTERVAL
-);
+setInterval(() => db.deleteExpiredTokens.run(Date.now()), CLEAN_INTERVAL);
 
 /**  生成指定长度的字母数字混合验证码 */
 function generateToken(length = 4) {
@@ -27,17 +24,10 @@ function bindDevice(req, res) {
     let token;
     while (true) {
       token = generateToken();
-      const row = db
-        .prepare(`SELECT * FROM tokens WHERE token = ? AND due > ?`)
-        .pluck()
-        .get(token, Date.now());
-      if (!row) break;
+      const { token: tk } = db.selectValidToken.get(token, Date.now()) ?? {};
+      if (!tk) break;
     }
-    db.prepare(`INSERT INTO tokens (token, user_id, due) VALUES (?, ?, ?)`).run(
-      token,
-      req.userId,
-      Date.now() + TOKEN_EXP_TIME
-    );
+    db.insertToken.run(token, req.userId, Date.now() + TOKEN_EXP_TIME);
 
     console.debug('Token generated:', token);
     res.json({ status: 'success', token: token });

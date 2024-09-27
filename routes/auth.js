@@ -3,21 +3,19 @@ const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXP_TIME = process.env.JWT_EXP_TIME ?? '6h'; // 6h
-const COOKIE_EXP_TIME = Number(process.env.COOKIE_EXP_TIME) ?? 24 * 60 * 60 * 1000; // 24h
 const APP_ID = process.env.APP_ID;
 const APP_SECRET = process.env.APP_SECRET;
-const BASE_URL = process.env.BASE_URL;
 const PORT = process.env.PORT;
-
+const BASE_URL = process.env.BASE_URL;
 // 请求登录预授权码
 function requestAuth(req, res) {
   const app_id = APP_ID;
-  const redirect_uri = BASE_URL + ':' + PORT + '/auth';
+  const redirect_uri = BASE_URL + ':' + PORT;
   const scope = 'contact:user.employee_id:readonly';
   const feishu = `https://open.feishu.cn/open-apis/authen/v1/authorize?app_id=${app_id}&redirect_uri=${redirect_uri}&scope=${scope}`;
-  console.debug('...Redirect to Feishu:', feishu);
   // 返回飞书认证链接
-  res.send({'link': feishu});
+  console.debug('Requesting auth:', feishu);
+  res.send({ link: feishu });
 }
 
 // 获取 app_access_token
@@ -94,13 +92,9 @@ async function getUserInfo(user_access_token) {
 // 授权回调函数
 async function handleAuthCallback(req, res) {
   try {
-    if (req.query.err) {
-      console.debug(req.query.err);
-      return res.status(400).json({status: 'error', message: 'req.query.err'});
-    }
-    console.debug('Feishu callback: code=', req.query.code);
-    const code = req.query.code,
-      app_id = APP_ID,
+    const code = req.body.code;
+    console.debug('Feishu callback: code=', code);
+    const app_id = APP_ID,
       app_secret = APP_SECRET,
       app_access_token = await getAppAccessToken(app_id, app_secret),
       user_access_token = await getUserAccessCode(app_access_token, code),
@@ -108,18 +102,11 @@ async function handleAuthCallback(req, res) {
       userId = user_info.user_id,
       jwt_token = generateJWT(userId);
 
-    // res.cookie('jwt', token, {
-    //   httpOnly: true,
-    //   // secure: true, // 在非 HTTPS 环境下注释掉这一行
-    //   sameSite: 'Strict',
-    //   maxAge: COOKIE_EXP_TIME, // Cookie 有效期
-    // });
-
     console.debug('JWT generated:', jwt_token);
-    res.json({status: 'success', user_id: userId, jwt: jwt_token});
+    res.json({ status: 'success', user_id: userId, jwt: jwt_token });
   } catch (err) {
     console.error(err);
-    res.status(500).json({status: 'error', meassage: 'Failed to authorize'});
+    res.status(500).json({ status: 'error', meassage: 'Failed to authorize' });
   }
 }
 
@@ -131,7 +118,6 @@ function generateJWT(userId) {
 // 验证 JWT 的中间件
 function authMiddleware(req, res, next) {
   const authHeader = req.get('Authorization');
-  console.log(authHeader);
   const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
 
   if (!token) {
