@@ -1,4 +1,5 @@
 const db = require('../db');
+const pinger = require('../pinger');
 
 // 绑定设备
 function verifyDevice(req, res) {
@@ -14,6 +15,7 @@ function verifyDevice(req, res) {
     db.deleteToken.run(token);
     db.insertDevice.run(userId, ip, 1);
     console.debug(`user ${userId} bound device ${ip}`);
+    pinger.addTimer(ip);
     res.json({ status: 'success', message: 'Device bound successfully' });
   } catch (err) {
     console.error(err);
